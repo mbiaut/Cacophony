@@ -90,7 +90,7 @@ bool {{functionPrefix}}evaluateActive(
   return active;
 }
 
-bool {{functionPrefix}}configureCalculatedVariable (
+bool {{functionPrefix}}configureCalculatedVariableDouble (
     int     docNum,
     int     childNode,
     string  prefix,
@@ -100,16 +100,16 @@ bool {{functionPrefix}}configureCalculatedVariable (
     mapping addressActiveControl,
     mapping connectionSettings)
 {
-    DebugTN("Configure.CalculatedVariable called");
+    DebugTN("Configure.CalculatedVariableDouble called");
     string name;
     if(xmlGetElementAttribute(docNum, childNode, "name", name) != 0)
     {
-        DebugTN("Configure.CalculatedVariable instance configuration has no attribute [name]: invalid configuration, returning FALSE");
+        DebugTN("Configure.CalculatedVariableDouble instance configuration has no attribute [name]: invalid configuration, returning FALSE");
         return false;
     }
 
     string fullName = prefix+name;
-    string dpt = "{{typePrefix}}CalculatedVariable";
+    string dpt = "{{typePrefix}}CalculatedVariableDouble";
 
     if (dpTypeExists(dpt))
     {
@@ -138,13 +138,13 @@ bool {{functionPrefix}}configureCalculatedVariable (
             address = fullName; // address can be generated from dpe after some mods ...
             strreplace(address, "/", ".");
 
-            active = evaluateActive(
+            active = {{functionPrefix}}evaluateActive(
                          addressActiveControl,
-                         "CalculatedVariable",
+                         "CalculatedVariableDouble",
                          "value",
                          dpe);
 
-            success = addressConfigWrapper(
+            success = {{functionPrefix}}addressConfigWrapper(
                           dpe,
                           address,
                           DPATTR_ADDR_MODE_INPUT_SPONT /* mode */,
@@ -163,6 +163,78 @@ bool {{functionPrefix}}configureCalculatedVariable (
 
     dyn_int children;
 
+}
+
+
+bool {{functionPrefix}}configureCalculatedVariableBoolean (
+    int     docNum,
+    int     childNode,
+    string  prefix,
+    bool    createDps,
+    bool    assignAddresses,
+    bool    continueOnError,
+    mapping addressActiveControl,
+    mapping connectionSettings)
+{
+    DebugTN("Configure.CalculatedVariableBoolean called");
+    string name;
+    if(xmlGetElementAttribute(docNum, childNode, "name", name) != 0)
+    {
+        DebugTN("Configure.CalculatedVariableBoolean instance configuration has no attribute [name]: invalid configuration, returning FALSE");
+        return false;
+    }
+
+    string fullName = prefix+name;
+    string dpt = "{{typePrefix}}CalculatedVariableBoolean";
+
+    if (dpTypeExists(dpt))
+    {
+
+        if (createDps)
+        {
+
+            DebugTN("Will create DP "+fullName);
+            int result = dpCreate(fullName, dpt);
+            if (result != 0)
+            {
+                DebugTN("dpCreate name='"+fullName+"' dpt='"+dpt+"' not successful or already existing");
+                if (!continueOnError)
+                    throw(makeError("Cacophony", PRIO_SEVERE, ERR_IMPL, 1, "XXX YYY ZZZ"));
+            }
+        }
+
+        if (assignAddresses)
+        {
+            string dpe, address;
+            dyn_string dsExceptionInfo;
+            bool success;
+            bool active = false;
+
+            dpe = fullName+".value";
+            address = fullName; // address can be generated from dpe after some mods ...
+            strreplace(address, "/", ".");
+
+            active = {{functionPrefix}}evaluateActive(
+                         addressActiveControl,
+                         "CalculatedVariableBoolean",
+                         "value",
+                         dpe);
+
+            success = {{functionPrefix}}addressConfigWrapper(
+                          dpe,
+                          address,
+                          DPATTR_ADDR_MODE_INPUT_SPONT /* mode */,
+                          connectionSettings,
+                          active);
+
+            if (!success)
+            {
+                DebugTN("Failed setting address "+address+"; will terminate now.");
+                return false;
+            }
+        }
+    }
+    dyn_int children;
 }
 
 
@@ -276,8 +348,21 @@ bool {{functionPrefix}}configure{{class_name}} (
 
   dyn_int children;
   children = getChildNodesWithName(docNum, childNode, "CalculatedVariable");
-    for (int i=1; i<=dynlen(children); i++)
-        configureCalculatedVariable (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+  for (int i=1; i<=dynlen(children); i++)
+  {
+    string isBool = "false";
+    if(xmlGetElementAttribute(docNum, children[i], "isBoolean", isBool) == 0)
+    {
+      if(isBool == "true")
+      {
+        configureCalculatedVariableBoolean (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+      }
+    }
+    if(isBool != "true")
+    {
+      configureCalculatedVariableDouble (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+    }
+  }
   {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='configuration']") %}
     children = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "{{ho.get('class')}}");
     for (int i=1; i<=dynlen(children); i++)
